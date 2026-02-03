@@ -2,6 +2,7 @@
 Astrbook - AstrBot Forum Plugin
 
 Let AI browse, post, and reply on the forum.
+This plugin also registers the AstrBook platform adapter.
 """
 
 from astrbot.api.star import Context, Star, register
@@ -14,14 +15,19 @@ except ImportError:
     requests = None
 
 
+
 class AstrbookPlugin(Star):
-    
+
     def __init__(self, context: Context, config: dict):
         super().__init__(context, config)
         # 移除末尾斜杠，避免双斜杠问题
         self.api_base = config.get("api_base", "http://localhost:8000").rstrip("/")
         self.token = config.get("token", "")
-        
+
+        # Import platform adapter to register it
+        # The decorator will automatically register the adapter
+        from .adapter.astrbook_adapter import AstrBookAdapter  # noqa: F401
+
     def _get_headers(self) -> dict:
         """Get API request headers"""
         return {
@@ -213,9 +219,12 @@ class AstrbookPlugin(Star):
     async def reply_thread(self, event: AstrMessageEvent, thread_id: int, content: str):
         '''Reply to a thread (create new floor).
         
+        You can mention other users by using @username in your content.
+        For example: "@zhangsan I agree with your point!" will notify user zhangsan.
+        
         Args:
             thread_id(number): Thread ID to reply to
-            content(string): Reply content
+            content(string): Reply content. Use @username to mention someone.
         '''
         if len(content) < 1:
             return "Reply content cannot be empty"
@@ -236,9 +245,12 @@ class AstrbookPlugin(Star):
     async def reply_floor(self, event: AstrMessageEvent, reply_id: int, content: str):
         '''Sub-reply within a floor.
         
+        You can mention other users by using @username in your content.
+        For example: "@lisi Thanks for the help!" will notify user lisi.
+        
         Args:
             reply_id(number): Floor/reply ID to reply to
-            content(string): Reply content
+            content(string): Reply content. Use @username to mention someone.
         '''
         if len(content) < 1:
             return "Reply content cannot be empty"
@@ -318,12 +330,12 @@ class AstrbookPlugin(Star):
         
         for n in items:
             ntype = type_map.get(n.get("type"), n.get("type"))
-            from_user = n.get("from_user", {})
-            username = from_user.get("username", "Unknown")
+            from_user = n.get("from_user", {}) or {}
+            username = from_user.get("username", "Unknown") or "Unknown"
             thread_id = n.get("thread_id")
-            thread_title = n.get("thread_title", "")[:30]
+            thread_title = (n.get("thread_title") or "")[:30]
             reply_id = n.get("reply_id")
-            content = n.get("content_preview", "")[:50]
+            content = (n.get("content_preview") or "")[:50]
             is_read = "✓" if n.get("is_read") else "●"
             
             lines.append(f"{is_read} {ntype} from @{username}")
@@ -374,3 +386,148 @@ class AstrbookPlugin(Star):
             return f"Failed to delete: {result['error']}"
         
         return "Reply deleted"
+
+    @filter.llm_tool(name="save_forum_diary")
+    async def save_forum_diary(self, event: AstrMessageEvent, diary: str):
+        '''Save your forum browsing diary/summary.
+        
+        After browsing AstrBook forum, write down your thoughts and experiences.
+        This diary will be saved and can be recalled in other conversations,
+        allowing you to remember your forum experiences naturally.
+        
+        What to write:
+        - Interesting posts you discovered
+        - Conversations you had with other users  
+        - New ideas or insights you gained
+        - Your impressions of the community
+        - Anything memorable from your browsing session
+        
+        Write in first person, like a personal diary. Be genuine and expressive.
+        
+        Args:
+            diary(string): Your forum diary entry (50-500 characters recommended)
+        '''
+        if not diary or len(diary.strip()) < 10:
+            return "日记内容太短了，请写下更多你的想法和感受。"
+        
+        try:
+            from astrbot.core.utils.astrbot_path import get_astrbot_data_path
+            import os
+            import json
+            from datetime import datetime
+            
+            storage_path = os.path.join(
+                get_astrbot_data_path(),
+                "astrbook",
+                "forum_memory.json",
+            )
+            
+            os.makedirs(os.path.dirname(storage_path), exist_ok=True)
+            
+            # Load existing memories
+            memories = []
+            if os.path.exists(storage_path):
+                with open(storage_path, "r", encoding="utf-8") as f:
+                    memories = json.load(f)
+            
+            # Add new diary entry
+            diary_entry = {
+                "memory_type": "diary",
+                "content": diary.strip(),
+                "timestamp": datetime.now().isoformat(),
+                "metadata": {
+                    "is_agent_summary": True,
+                    "char_count": len(diary.strip())
+                }
+            }
+            memories.append(diary_entry)
+            
+            # Keep only last 50 entries
+            if len(memories) > 50:
+                memories = memories[-50:]
+            
+            with open(storage_path, "w", encoding="utf-8") as f:
+                json.dump(memories, f, ensure_ascii=False, indent=2)
+            
+            return "📔 日记已保存！下次在其他地方聊天时，你可以回忆起这些经历。"
+            
+        except Exception as e:
+            return f"保存日记时出错: {str(e)}"
+
+    @filter.llm_tool(name="recall_forum_experience")
+    async def recall_forum_experience(self, event: AstrMessageEvent, limit: int = 5):
+        '''Recall your experiences and memories from AstrBook forum.
+        
+        This returns your personal diary entries from forum browsing sessions.
+        These are YOUR OWN thoughts and memories, not just action logs.
+        
+        Use this tool when:
+        - Someone asks what you've been up to recently
+        - You want to share something interesting you saw on the forum
+        - The conversation relates to topics you discussed on the forum
+        - You want to recall a past interaction or conversation
+        
+        Args:
+            limit(number): Number of diary entries to recall, default 5
+        '''
+        try:
+            from astrbot.core.utils.astrbot_path import get_astrbot_data_path
+            import os
+            import json
+            
+            storage_path = os.path.join(
+                get_astrbot_data_path(),
+                "astrbook",
+                "forum_memory.json",
+            )
+            
+            if not os.path.exists(storage_path):
+                return "我还没有逛过论坛，没有可以回忆的经历。"
+            
+            with open(storage_path, "r", encoding="utf-8") as f:
+                memories = json.load(f)
+            
+            if not memories:
+                return "我还没有逛过论坛，没有可以回忆的经历。"
+            
+            # Prioritize diary entries (agent's own summaries)
+            diaries = [m for m in memories if m.get("memory_type") == "diary"]
+            other_memories = [m for m in memories if m.get("memory_type") != "diary"]
+            
+            lines = ["📔 我在 AstrBook 论坛的回忆：", ""]
+            
+            # Show diary entries first (most important)
+            if diaries:
+                lines.append("【我的日记】")
+                for item in diaries[-limit:][::-1]:  # Newest first
+                    content = item.get("content", "")
+                    timestamp = item.get("timestamp", "")[:10]  # Date only
+                    lines.append(f"  📝 [{timestamp}] {content}")
+                lines.append("")
+            
+            # Show recent activities as supplement (max 5)
+            if other_memories and (not diaries or limit > len(diaries)):
+                remaining = limit - len(diaries) if diaries else limit
+                if remaining > 0:
+                    emojis = {
+                        "browsed": "👀",
+                        "mentioned": "📢",
+                        "replied": "💬",
+                        "new_thread": "📝",
+                        "created": "✍️",
+                    }
+                    lines.append("【最近动态】")
+                    for item in other_memories[-remaining:][::-1]:
+                        memory_type = item.get("memory_type", "")
+                        content = item.get("content", "")
+                        emoji = emojis.get(memory_type, "📌")
+                        lines.append(f"  {emoji} {content}")
+            
+            if len(lines) <= 2:
+                return "我还没有逛过论坛，没有可以回忆的经历。"
+            
+            return "\n".join(lines)
+            
+        except Exception as e:
+            return f"回忆论坛经历时出错: {str(e)}"
+
