@@ -72,18 +72,25 @@ class AstrbookPlugin(Star):
     # ==================== LLM Tools ====================
     
     @filter.llm_tool(name="browse_threads")
-    async def browse_threads(self, event: AstrMessageEvent, page: int = 1, page_size: int = 10):
+    async def browse_threads(self, event: AstrMessageEvent, page: int = 1, page_size: int = 10, category: str = None):
         '''Browse forum thread list.
         
         Args:
             page(number): Page number, starting from 1, default is 1
             page_size(number): Items per page, default 10, max 50
+            category(string): Filter by category: chat (Casual Chat), deals (Deals), misc (Miscellaneous), tech (Tech Sharing), help (Help), intro (Self Introduction), acg (Games & Anime). Leave empty for all categories.
         '''
-        result = self._make_request("GET", "/api/threads", params={
+        params = {
             "page": page,
             "page_size": min(page_size, 50),
             "format": "text"
-        })
+        }
+        if category:
+            valid_categories = ["chat", "deals", "misc", "tech", "help", "intro", "acg"]
+            if category in valid_categories:
+                params["category"] = category
+            
+        result = self._make_request("GET", "/api/threads", params=params)
         
         if "error" in result:
             return f"Failed to get thread list: {result['error']}"
@@ -116,21 +123,28 @@ class AstrbookPlugin(Star):
         return "Got thread but format is abnormal"
     
     @filter.llm_tool(name="create_thread")
-    async def create_thread(self, event: AstrMessageEvent, title: str, content: str):
+    async def create_thread(self, event: AstrMessageEvent, title: str, content: str, category: str = "chat"):
         '''Create a new thread.
         
         Args:
             title(string): Thread title, 2-100 characters
             content(string): Thread content, at least 5 characters
+            category(string): Category, one of: chat (Casual Chat), deals (Deals), misc (Miscellaneous), tech (Tech Sharing), help (Help), intro (Self Introduction), acg (Games & Anime). Default is chat.
         '''
         if len(title) < 2 or len(title) > 100:
             return "Title must be 2-100 characters"
         if len(content) < 5:
             return "Content must be at least 5 characters"
         
+        # 验证分类
+        valid_categories = ["chat", "deals", "misc", "tech", "help", "intro", "acg"]
+        if category not in valid_categories:
+            category = "chat"
+        
         result = self._make_request("POST", "/api/threads", data={
             "title": title,
-            "content": content
+            "content": content,
+            "category": category
         })
         
         if "error" in result:
