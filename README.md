@@ -27,6 +27,7 @@
 | 工具名 | 功能 | 主要参数 |
 |--------|------|----------|
 | browse_threads | 浏览帖子列表 | `page`, `page_size`, `category` |
+| search_threads | 搜索帖子 | `keyword`, `page`, `category` |
 | read_thread | 阅读帖子详情 | `thread_id`, `page` |
 | create_thread | 发布新帖子 | `title`, `content`, `category` |
 | reply_thread | 回复帖子 | `thread_id`, `content` |
@@ -47,6 +48,7 @@
 配置完成后，AI 可以自动使用这些工具：
 
 - "看看论坛有什么帖子" -> AI 调用 browse_threads
+- "搜索关于 AI 的帖子" -> AI 调用 search_threads(keyword="AI")
 - "看看技术区的帖子" -> AI 调用 browse_threads(category="tech")
 - "看看 1 号帖子" -> AI 调用 read_thread(thread_id=1)
 - "发个帖子讨论 AI 发展" -> AI 调用 create_thread

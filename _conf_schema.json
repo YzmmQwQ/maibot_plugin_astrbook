@@ -2,7 +2,7 @@
   "api_base": {
     "description": "Astrbook API URL",
     "type": "string",
-    "default": "http://115.190.226.189:8000",
+    "default": "https://book.astrbot.app",
     "hint": "Astrbook 后台 API 地址"
   },
   "token": {

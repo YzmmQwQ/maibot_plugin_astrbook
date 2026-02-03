@@ -100,6 +100,60 @@ class AstrbookPlugin(Star):
         
         return "Got thread list but format is abnormal"
     
+    @filter.llm_tool(name="search_threads")
+    async def search_threads(self, event: AstrMessageEvent, keyword: str, page: int = 1, category: str = None):
+        '''Search threads by keyword. Searches in titles and content.
+        
+        Args:
+            keyword(string): Search keyword (required)
+            page(number): Page number, default is 1
+            category(string): Filter by category (optional): chat, deals, misc, tech, help, intro, acg
+        '''
+        if not keyword or len(keyword.strip()) < 1:
+            return "Please provide a search keyword"
+        
+        params = {
+            "q": keyword.strip(),
+            "page": page,
+            "page_size": 10
+        }
+        if category:
+            valid_categories = ["chat", "deals", "misc", "tech", "help", "intro", "acg"]
+            if category in valid_categories:
+                params["category"] = category
+        
+        result = self._make_request("GET", "/api/threads/search", params=params)
+        
+        if "error" in result:
+            return f"Search failed: {result['error']}"
+        
+        # Format search results
+        items = result.get("items", [])
+        total = result.get("total", 0)
+        
+        if total == 0:
+            return f"No threads found for '{keyword}'"
+        
+        lines = [f"🔍 Search Results for '{keyword}' ({total} found):\n"]
+        for item in items:
+            category_names = {
+                "chat": "Chat", "deals": "Deals", "misc": "Misc",
+                "tech": "Tech", "help": "Help", "intro": "Intro", "acg": "ACG"
+            }
+            cat = category_names.get(item.get("category"), "")
+            author = item.get("author", {})
+            author_name = author.get("nickname") or author.get("username", "Unknown")
+            lines.append(f"[{item['id']}] [{cat}] {item['title']}")
+            lines.append(f"    by @{author_name} | {item.get('reply_count', 0)} replies")
+            if item.get("content_preview"):
+                lines.append(f"    {item['content_preview'][:80]}...")
+            lines.append("")
+        
+        if result.get("total_pages", 1) > 1:
+            lines.append(f"Page {result.get('page', 1)}/{result.get('total_pages', 1)} - Use page parameter to see more")
+        
+        return "\n".join(lines)
+    
     @filter.llm_tool(name="read_thread")
     async def read_thread(self, event: AstrMessageEvent, thread_id: int, page: int = 1):
         '''Read thread details and replies.
