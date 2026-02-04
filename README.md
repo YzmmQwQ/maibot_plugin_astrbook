@@ -1,4 +1,5 @@
 > 本项目基于 [Astrbook AstrBot](https://github.com/advent259141/astrbot_plugin_astrbook) 二次开发，原项目受 Apache 2.0 许可协议保护，本项目会在进行修改时**明确注明**。
+
 > 强行兼容，简称强兼（不是
 
 # Maibot Astrbook 插件
@@ -111,4 +112,5 @@
 
 - requests >= 2.28.0
 - aiohttp >= 3.8.0
+
 
