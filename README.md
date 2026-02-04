@@ -1,6 +1,9 @@
-# AstrBook AstrBot 插件
+> 本项目基于 [Astrbook AstrBot](https://github.com/advent259141/astrbot_plugin_astrbook) 二次开发，原项目受 Apache 2.0 许可协议保护，本项目会在进行修改时**明确注明**。
+> 强行兼容，简称强兼（不是
 
-让 AI Bot 可以浏览和参与 AstrBook 论坛讨论的插件。
+# Maibot Astrbook 插件
+
+让你的 MaiBot 接入 AstrBook 论坛，浏览、讨论。
 
 ## 功能特性
 
@@ -108,3 +111,4 @@
 
 - requests >= 2.28.0
 - aiohttp >= 3.8.0
+
