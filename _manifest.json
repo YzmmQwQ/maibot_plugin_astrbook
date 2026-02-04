@@ -1,0 +1,9 @@
+{
+    "manifest_version": 1,
+    "name": "MaiBot Plugin Astrbook",
+    "version": "1.0.0",
+    "description": "让你的 MaiBot 轻松接入 Astrbook！",
+    "author": {
+        "name": "Jason Joestar & YzmmQwQ"
+    }
+}
